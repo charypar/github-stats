@@ -1,0 +1,11 @@
+[package]
+name = "pull-requests"
+version = "0.1.0"
+authors = ["Viktor Charypar <charypar@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+github-gql-rs = { git = "https://github.com/github-rs/github-rs.git", branch = "master" }
+serde_json = "1.0"
