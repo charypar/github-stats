@@ -3,6 +3,54 @@ use gh::query::Query;
 use github_gql as gh;
 use serde_json::Value;
 
+// Data model
+
+type ISODate = String;
+type BusinessHours = u32;
+
+struct PullRequestCommit {
+    sha: String,
+}
+
+enum ReviewStatus {
+    Pending,
+    Commented,
+    Approved,
+    ChangesRequested,
+    Dismissed,
+}
+
+struct PullRequestReview {
+    state: ReviewStatus,
+}
+
+enum EventDetail {
+    Open,
+    Commit(PullRequestCommit),
+    Review(PullRequestReview),
+    Merged,
+    Closed,
+}
+
+struct PullRequestEvent {
+    pub actor: String,
+    pub team: String,
+    pub timestamp: ISODate,
+    pub duration: BusinessHours,
+    pub details: EventDetail,
+}
+
+struct PullRequest {
+    number: usize,
+    title: String,
+    additions: u32,
+    deletions: u32,
+    suggested_reviewers: Vec<String>,
+    events: Vec<PullRequestEvent>,
+}
+
+// GraphQL fetching
+
 fn fetch_teams(github: &mut Github) -> Vec<Value> {
     let query = Query::new_raw(
         "{
@@ -12,7 +60,7 @@ fn fetch_teams(github: &mut Github) -> Vec<Value> {
                     name
                     members {
                         nodes {
-                        login
+                            login
                         }
                     }
                 }
@@ -134,6 +182,10 @@ fn fetch_pull_requests(github: &mut Github, total: usize) -> Vec<Value> {
     }
     return pull_requests;
 }
+
+// Processing JSON into data
+
+// Writing tabular output
 
 fn main() {
     let mut github = Github::new("92e86a66b4f38662fbb67d6560a419808d891b62").unwrap();
