@@ -9,3 +9,5 @@ edition = "2018"
 [dependencies]
 github-gql-rs = { git = "https://github.com/github-rs/github-rs.git", branch = "master" }
 serde_json = "1.0"
+chrono = "0.4"
+
