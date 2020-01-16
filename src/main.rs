@@ -92,6 +92,39 @@ struct PullRequest<'a> {
     events: Vec<PullRequestEvent<'a>>,
 }
 
+struct RecordRow {
+    timestamp: String,
+    actor: Option<String>,
+    event_type: String,
+    delay: f64,
+    pr_number: i64,
+    pr_size: i64,
+    from_teams: String,
+    to_teams: String,
+    review_state: Option<String>,
+    review_comments: Option<i64>,
+}
+
+impl std::fmt::Display for RecordRow {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let blank = String::from("");
+        write!(
+            f,
+            "{}\t{}\t{}\t{:.3}\t{}\t{}\t{}\t{}\t{}\t{}",
+            self.timestamp,
+            self.actor.as_ref().unwrap_or(&blank),
+            self.event_type,
+            self.delay,
+            self.pr_number,
+            self.pr_size,
+            self.from_teams,
+            self.to_teams,
+            self.review_state.as_ref().unwrap_or(&blank),
+            self.review_comments.unwrap_or(0)
+        )
+    }
+}
+
 // GraphQL fetching
 
 fn fetch_teams(github: &mut Github) -> Vec<Value> {
@@ -200,7 +233,7 @@ fn fetch_pull_requests(github: &mut Github, total: usize) -> Vec<Value> {
     for _ in 0..=(total / 100 + 1) {
         let query = fetch_pull_request_query(limit, &after);
 
-        println!(
+        eprintln!(
             "Fetching Pull Requests... {}/{}",
             pull_requests.len() + limit,
             total
@@ -378,58 +411,87 @@ fn main() {
     let teams = fetch_teams(&mut github);
     let team_from_user = index_teams_by_users(&teams);
 
-    let pull_requests_json = fetch_pull_requests(&mut github, 400);
-    let pull_requests: Vec<_> = pull_requests_json
-        .iter()
-        .map(|pr| build_pull_request(pr, &team_from_user))
-        .collect();
+    let pull_requests_json = fetch_pull_requests(&mut github, 600);
 
-    for pr in &pull_requests {
-        println!(
-            "PR #{} ({} lines). By {} ({}), reviewed by {} ({}).",
-            pr.number,
-            pr.diff_size,
-            pr.author,
-            pr.authoring_teams.join(", "),
-            pr.reviewers.join(", "),
-            pr.reviewing_teams.join(", ")
-        );
+    // TODO turn into a csv
+
+    println!("timestamp\tactor\tevent_type\tdelay\tpr_number\tpr_size\tfrom_teams\tto_teams\treview_state\treview_comments");
+    for json in &pull_requests_json {
+        let pr = build_pull_request(json, &team_from_user);
+
         for event in &pr.events {
-            match &event.details {
-                EventDetail::Open => println!(
-                    "- Opened by {} on {} (after {:.2} hours)",
-                    event.actor.unwrap_or(""),
-                    event.timestamp,
-                    event.delay
-                ),
-                EventDetail::Commit(_) => println!(
-                    "- Committed to by {} on {} (after {:.2} hours)",
-                    event.actor.unwrap_or(""),
-                    event.timestamp,
-                    event.delay
-                ),
-                EventDetail::Review(review) => println!(
-                    "- Reviewed by {} ({}) on {} (after {:.2} hours), {} comments",
-                    event.actor.unwrap_or(""),
-                    review.state,
-                    event.timestamp,
-                    event.delay,
-                    review.comment_count
-                ),
-                EventDetail::Merged => println!(
-                    "- Merged by {} on {} (after {:.2} hours)",
-                    event.actor.unwrap_or(""),
-                    event.timestamp,
-                    event.delay
-                ),
-                EventDetail::Closed => println!(
-                    "- Closed by {} on {} (after {:.2} hours)",
-                    event.actor.unwrap_or(""),
-                    event.timestamp,
-                    event.delay
-                ),
-            }
+            let from_teams = pr.authoring_teams.join(",");
+            let to_teams = pr.reviewing_teams.join(",");
+
+            let row = match &event.details {
+                EventDetail::Open => RecordRow {
+                    actor: event.actor.map(String::from),
+                    timestamp: String::from(event.timestamp),
+                    delay: event.delay,
+                    event_type: String::from("OPEN"),
+                    pr_number: pr.number,
+                    pr_size: pr.diff_size,
+                    from_teams: from_teams,
+                    to_teams: to_teams,
+                    review_state: None,
+                    review_comments: None,
+                },
+                EventDetail::Commit(_) => RecordRow {
+                    actor: event.actor.map(String::from),
+                    timestamp: String::from(event.timestamp),
+                    delay: event.delay,
+                    event_type: String::from("COMMIT"),
+                    pr_number: pr.number,
+                    pr_size: pr.diff_size,
+                    from_teams: from_teams,
+                    to_teams: to_teams,
+                    review_state: None,
+                    review_comments: None,
+                },
+                EventDetail::Review(review) => {
+                    let state = format!("{}", review.state);
+                    let state_str = state.as_str();
+
+                    RecordRow {
+                        actor: event.actor.map(String::from),
+                        timestamp: String::from(event.timestamp),
+                        delay: event.delay,
+                        event_type: String::from("REVIEW"),
+                        pr_number: pr.number,
+                        pr_size: pr.diff_size,
+                        from_teams: from_teams,
+                        to_teams: to_teams,
+                        review_state: Some(String::from(state_str)),
+                        review_comments: Some(review.comment_count),
+                    }
+                }
+                EventDetail::Merged => RecordRow {
+                    actor: event.actor.map(String::from),
+                    timestamp: String::from(event.timestamp),
+                    delay: event.delay,
+                    event_type: String::from("MERGED"),
+                    pr_number: pr.number,
+                    pr_size: pr.diff_size,
+                    from_teams: from_teams,
+                    to_teams: to_teams,
+                    review_state: None,
+                    review_comments: None,
+                },
+                EventDetail::Closed => RecordRow {
+                    actor: event.actor.map(String::from),
+                    timestamp: String::from(event.timestamp),
+                    delay: event.delay,
+                    event_type: String::from("CLOSED"),
+                    pr_number: pr.number,
+                    pr_size: pr.diff_size,
+                    from_teams: from_teams,
+                    to_teams: to_teams,
+                    review_state: None,
+                    review_comments: None,
+                },
+            };
+
+            println!("{}", row);
         }
-        println!("");
     }
 }
