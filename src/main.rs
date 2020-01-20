@@ -69,7 +69,9 @@ fn main() {
         .unwrap();
     let teams = matches.value_of("teams").unwrap_or("");
 
-    let mut github = Github::new("92e86a66b4f38662fbb67d6560a419808d891b62").unwrap();
+    let token = std::env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN environment variable");
+
+    let mut github = Github::new(token).unwrap();
 
     let teams = fetch_teams(&mut github, org, teams);
     let team_from_user = index_teams_by_users(&teams);

@@ -1,0 +1,2 @@
+cargo build
+GITHUB_TOKEN=92e86a66b4f38662fbb67d6560a419808d891b62 target/debug/pull-requests redbadger pagofx 600 -t cdk-wave-
