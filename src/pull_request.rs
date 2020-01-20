@@ -108,7 +108,7 @@ fn build_event<'a>(
         actor: actor,
         teams: users_teams(&[actor.unwrap_or("")], teams_by_user),
         delay: 0.0,
-        delay_workhours: 0, // fix
+        delay_workhours: 0, // FIXME calculate this
         details: details,
     }
 }
