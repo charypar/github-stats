@@ -1,9 +1,8 @@
-extern crate chrono;
-
 mod csv;
 mod fetch;
 mod pull_request;
 
+use clap::{App, Arg};
 use github_gql::client::Github;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -31,10 +30,44 @@ fn index_teams_by_users(teams: &Vec<Value>) -> HashMap<&str, Vec<&str>> {
 }
 
 fn main() {
-    let org = "redbadger";
-    let repo = "pagofx";
-    let teams = "cdk-wave-";
-    let limit = 600;
+    let matches = App::new("Pull Request Stats")
+        .version("iv20-01-2020")
+        .author("Viktor Charypar <charypar@gmail.com>")
+        .about("Gives statistics for pull requests in a repository focusing on reviews")
+        .arg(
+            Arg::with_name("OWNER")
+                .index(1)
+                .required(true)
+                .help("Repository owner"),
+        )
+        .arg(
+            Arg::with_name("REPO")
+                .index(2)
+                .required(true)
+                .help("Repository name"),
+        )
+        .arg(
+            Arg::with_name("COUNT")
+                .index(3)
+                .help("Number of pull requests to fetch (default 100)"),
+        )
+        .arg(
+            Arg::with_name("teams")
+                .short("t")
+                .long("teams")
+                .takes_value(true)
+                .help("Teams to consider"),
+        )
+        .get_matches();
+
+    let org = matches.value_of("OWNER").expect("Specify owner!");
+    let repo = matches.value_of("REPO").expect("Specify repo!");
+    let limit = matches
+        .value_of("COUNT")
+        .unwrap_or("100")
+        .parse::<usize>()
+        .unwrap();
+    let teams = matches.value_of("teams").unwrap_or("");
 
     let mut github = Github::new("92e86a66b4f38662fbb67d6560a419808d891b62").unwrap();
 
